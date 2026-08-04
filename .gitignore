@@ -1,0 +1,14 @@
+# Binarios
+*.rpm
+*.deb
+*.tar.gz
+
+# Datos sensibles (nunca versionar wallets o configs locales)
+*.sparrow/
+share/
+certs/
+*.log
+
+# Entorno personal
+.env
+run-local.sh
