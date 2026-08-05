@@ -1,0 +1,71 @@
+#!/bin/bash
+set -euo pipefail
+
+# --- Configuración ---
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sparrow-container"
+CONFIG_FILE="${CONFIG_DIR}/config"
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+  # shellcheck source=/dev/null
+  source "${CONFIG_FILE}"
+fi
+
+TOR_SERVICE="${TOR_SERVICE:-tor-client.service}"
+TOR_HOST="${TOR_HOST:-podmantor}"
+TOR_PORT="${TOR_PORT:-9050}"
+SPARROW_NETWORK="${SPARROW_NETWORK:-tornet}"
+
+if [[ -z "${SPARROW_DATA_DIR:-}" ]]; then
+  echo "[!] ERROR: SPARROW_DATA_DIR no definido en ${CONFIG_FILE}" >&2
+  exit 1
+fi
+
+if [[ ! -d "${SPARROW_DATA_DIR}" ]]; then
+  echo "[!] ERROR: No existe: ${SPARROW_DATA_DIR}" >&2
+  exit 1
+fi
+
+# --- Tor ---
+if ! systemctl --user is-active --quiet "${TOR_SERVICE}" 2>/dev/null; then
+  echo "[!] ${TOR_SERVICE} no activo. Arrancando..."
+  systemctl --user start "${TOR_SERVICE}" || {
+    echo "[!] Fallo al arrancar Tor"
+    exit 1
+  }
+
+  echo "[*] Esperando proxy SOCKS..."
+  # Sin depender de 'nc', usa bash puro
+  timeout 15 bash -c 'until printf "" >/dev/tcp/127.0.0.1/'"${TOR_PORT}"' 2>/dev/null; do sleep 1; done' || {
+    echo "[!] Timeout esperando a Tor" >&2
+    exit 1
+  }
+  echo "[+] Tor listo."
+else
+  echo "[+] ${TOR_SERVICE} ya activo."
+fi
+
+# --- X11 ---
+xhost "+si:localuser:$(whoami)" 2>/dev/null || true
+
+# --- Red ---
+NETWORK_FLAGS=()
+[[ -n "${SPARROW_NETWORK}" ]] && NETWORK_FLAGS=(--network "${SPARROW_NETWORK}")
+
+# --- Lanzar ---
+exec podman run --rm -it \
+  --name "sparrowwallet" \
+  --replace \
+  --userns=keep-id \
+  --group-add keep-groups \
+  --security-opt label=type:container_runtime_t \
+  --security-opt no-new-privileges:true \
+  --cap-drop=ALL \
+  --device /dev/bus/usb \
+  --device /dev/hidraw0 \
+  -e DISPLAY=:0 \
+  -e XDG_RUNTIME_DIR=/tmp \
+  -e _JAVA_OPTIONS="-Dprism.order=sw" \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+  -v "${SPARROW_DATA_DIR}:/home/cripto/.sparrow:Z" \
+  "${NETWORK_FLAGS[@]}" \
+  localhost/sparrow:latest

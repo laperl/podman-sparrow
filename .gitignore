@@ -1,6 +1,5 @@
 # Configuración local (puede contener rutas sensibles)
 config
-*.local
 .env
 
 # Binarios descargados
@@ -9,4 +8,3 @@ config
 
 # Datos de wallet (por si alguien ejecuta esto en el directorio del repo)
 *.sparrow/
-share/

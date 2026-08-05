@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Sparrow Wallet
+Comment=Bitcoin wallet via Podman (Tor)
+Exec=/home/jaume/.local/bin/sparrow-podman
+Type=Application
+Terminal=false
+Icon=bitcoin
+Categories=Office;Finance;
+Keywords=bitcoin;wallet;crypto;
