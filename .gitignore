@@ -1,14 +1,12 @@
-# Binarios
+# Configuración local (puede contener rutas sensibles)
+config
+*.local
+.env
+
+# Binarios descargados
 *.rpm
 *.deb
-*.tar.gz
 
-# Datos sensibles (nunca versionar wallets o configs locales)
+# Datos de wallet (por si alguien ejecuta esto en el directorio del repo)
 *.sparrow/
 share/
-certs/
-*.log
-
-# Entorno personal
-.env
-run-local.sh
