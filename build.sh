@@ -7,9 +7,12 @@ RPM="sparrowwallet-${VERSION}-1.${ARCH}.rpm"
 BASE_URL="https://github.com/sparrowwallet/sparrow/releases/download/${VERSION}"
 MANIFEST="sparrow-${VERSION}-manifest.txt"
 MANIFEST_SIG="${MANIFEST}.asc"
-
-# Clave PGP de Craig Raw (desarrollador)
 GPG_KEY="D4D0D3202FC06849A257B38DE94618334C674B40"
+
+cleanup() {
+  rm -f "${RPM}" "${MANIFEST}" "${MANIFEST_SIG}" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 echo "[*] Descargando Sparrow ${VERSION}..."
 curl -fsSL -o "${RPM}" "${BASE_URL}/${RPM}"
@@ -24,9 +27,10 @@ echo "[*] Verificando checksum del RPM..."
 sha256sum --check --ignore-missing "${MANIFEST}"
 
 echo "[*] Construyendo imagen Podman..."
-podman build -t localhost/sparrow:latest -f Containerfile .
-
-echo "[*] Limpieza..."
-rm -f "${RPM}" "${MANIFEST}" "${MANIFEST_SIG}"
+podman build \
+  --build-arg RPM_FILE="${RPM}" \
+  -t localhost/sparrow:latest \
+  -f Containerfile \
+  .
 
 echo "[+] Imagen localhost/sparrow:latest lista."
