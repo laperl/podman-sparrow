@@ -1,0 +1,8 @@
+# Copiar a ~/.config/sparrow-container/config y personalizar
+# Tambien se puede gestionar con dotfiles stow
+# NO editar este archivo directamente si contiene rutas personales
+
+SPARROW_DATA_DIR="${HOME}/.local/share/sparrowwallet"
+TOR_SERVICE="tor-container.service"
+TOR_HOST="host.containers.internal"
+TOR_PORT="9050"
