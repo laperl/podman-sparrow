@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION="${1:-2.5.3}"
+VERSION="${1:-2.5.6}"
 ARCH="x86_64"
 RPM="sparrowwallet-${VERSION}-1.${ARCH}.rpm"
 BASE_URL="https://github.com/sparrowwallet/sparrow/releases/download/${VERSION}"
