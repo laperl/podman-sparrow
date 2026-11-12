@@ -1,10 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+# --- Cadena: mainnet (por defecto) | signet | testnet | testnet4 | regtest ---
+CHAIN="${1:-mainnet}"
+case "${CHAIN}" in
+  mainnet|signet|testnet|testnet4|regtest) ;;
+  *) echo "[!] Cadena no válida: ${CHAIN}" >&2; exit 1 ;;
+esac
+
 # --- Configuración ---
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sparrow-container"
 CONFIG_FILE="${CONFIG_DIR}/config"
-
 if [[ -f "${CONFIG_FILE}" ]]; then
   # shellcheck source=/dev/null
   source "${CONFIG_FILE}"
@@ -13,32 +19,39 @@ fi
 TOR_SERVICE="${TOR_SERVICE:-tor-client.service}"
 TOR_HOST="${TOR_HOST:-podmantor}"
 TOR_PORT="${TOR_PORT:-9050}"
-SPARROW_NETWORK="${SPARROW_NETWORK:-tornet}"
+SPARROW_NETWORK="${SPARROW_NETWORK:-tornet}"   # red de podman, no de bitcoin
+SPARROW_BIN="${SPARROW_BIN:-}"                 # solo si la imagen usa CMD en vez de ENTRYPOINT
 
-if [[ -z "${SPARROW_DATA_DIR:-}" ]]; then
+# --- Datos y nombre de contenedor por cadena ---
+if [[ "${CHAIN}" == "mainnet" ]]; then
+  DATA_DIR="${SPARROW_DATA_DIR:-}"
+  CONTAINER_NAME="sparrowwallet"
+  SPARROW_ARGS=()
+else
+  # p. ej. SPARROW_DATA_DIR_SIGNET en el config; si no, uno por defecto
+  var="SPARROW_DATA_DIR_${CHAIN^^}"
+  DATA_DIR="${!var:-${HOME}/.local/share/sparrow-${CHAIN}}"
+  mkdir -p "${DATA_DIR}"
+  CONTAINER_NAME="sparrowwallet-${CHAIN}"
+  SPARROW_ARGS=(-n "${CHAIN}")
+fi
+
+if [[ -z "${DATA_DIR}" ]]; then
   echo "[!] ERROR: SPARROW_DATA_DIR no definido en ${CONFIG_FILE}" >&2
   exit 1
 fi
-
-if [[ ! -d "${SPARROW_DATA_DIR}" ]]; then
-  echo "[!] ERROR: No existe: ${SPARROW_DATA_DIR}" >&2
+if [[ ! -d "${DATA_DIR}" ]]; then
+  echo "[!] ERROR: No existe: ${DATA_DIR}" >&2
   exit 1
 fi
 
 # --- Tor ---
 if ! systemctl --user is-active --quiet "${TOR_SERVICE}" 2>/dev/null; then
   echo "[!] ${TOR_SERVICE} no activo. Arrancando..."
-  systemctl --user start "${TOR_SERVICE}" || {
-    echo "[!] Fallo al arrancar Tor"
-    exit 1
-  }
-
+  systemctl --user start "${TOR_SERVICE}" || { echo "[!] Fallo al arrancar Tor" >&2; exit 1; }
   echo "[*] Esperando proxy SOCKS..."
-  # Sin depender de 'nc', usa bash puro
   timeout 15 bash -c 'until printf "" >/dev/tcp/127.0.0.1/'"${TOR_PORT}"' 2>/dev/null; do sleep 1; done' || {
-    echo "[!] Timeout esperando a Tor" >&2
-    exit 1
-  }
+    echo "[!] Timeout esperando a Tor" >&2; exit 1; }
   echo "[+] Tor listo."
 else
   echo "[+] ${TOR_SERVICE} ya activo."
@@ -47,13 +60,19 @@ fi
 # --- X11 ---
 xhost "+si:localuser:$(whoami)" 2>/dev/null || true
 
-# --- Red ---
+# --- Red de podman ---
 NETWORK_FLAGS=()
 [[ -n "${SPARROW_NETWORK}" ]] && NETWORK_FLAGS=(--network "${SPARROW_NETWORK}")
 
-# --- Lanzar ---
+# --- Comando dentro del contenedor ---
+CMD=()
+[[ -n "${SPARROW_BIN}" ]] && CMD=("${SPARROW_BIN}")
+CMD+=("${SPARROW_ARGS[@]}")
+
+echo "[*] Lanzando Sparrow (${CHAIN}) en contenedor ${CONTAINER_NAME}"
+
 exec podman run --rm -it \
-  --name "sparrowwallet" \
+  --name "${CONTAINER_NAME}" \
   --replace \
   --userns=keep-id \
   --group-add keep-groups \
@@ -66,6 +85,7 @@ exec podman run --rm -it \
   -e XDG_RUNTIME_DIR=/tmp \
   -e _JAVA_OPTIONS="-Dprism.order=sw" \
   -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
-  -v "${SPARROW_DATA_DIR}:/home/cripto/.sparrow:Z" \
+  -v "${DATA_DIR}:/home/cripto/.sparrow:Z" \
   "${NETWORK_FLAGS[@]}" \
-  localhost/sparrow:latest
+  localhost/sparrow:latest \
+  "${CMD[@]}"

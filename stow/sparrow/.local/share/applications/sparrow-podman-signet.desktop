@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Sparrow Wallet (Signet)
+Comment=Bitcoin wallet en SIGNET vía Podman (Tor)
+Exec=/home/jaume/.local/bin/sparrow-podman signet
+Type=Application
+Terminal=false
+Icon=bitcoin
+Categories=Office;Finance;
+Keywords=bitcoin;wallet;crypto;signet;test;
+StartupWMClass=sparrow-signet
